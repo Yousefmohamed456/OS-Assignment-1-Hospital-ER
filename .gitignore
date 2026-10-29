@@ -1,0 +1,15 @@
+*.class
+*.jar
+*.war
+out/
+build/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.swp
+*.swo
+*~
+Thumbs.db
+*.tmp
+*.log
