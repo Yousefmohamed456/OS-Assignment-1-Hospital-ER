@@ -6,7 +6,7 @@
 - Description: This repository will contain a multithreaded hospital emergency room simulation using semaphores, a bounded buffer, and producer-consumer synchronization.
 
 ## Team Members
-- Member 1
-- Member 2
-- Member 3
-- Member 4
+- Member 1: Hospital.java
+- Member 2: Semaphore.java and TreatmentRoom.java
+- Member 3: Patient.java and WaitingRoom.java
+- Member 4: Doctor.java
