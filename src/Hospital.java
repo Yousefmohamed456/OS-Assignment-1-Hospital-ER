@@ -40,11 +40,9 @@ public class Hospital {
         log("Number of doctors: " + numberOfDoctors);
         log("Number of patients: " + numberOfPatients);
 
-        // Create shared resources
         waitingRoom = new WaitingRoom(waitingRoomCapacity);
-        treatmentRoom = new TreatmentRoom(2); // Fixed capacity of 2 as required
+        treatmentRoom = new TreatmentRoom(2); 
 
-        // Create and start all Patient threads
         for (int i = 0; i < numberOfPatients; i++) {
             Patient patient = new Patient(i, waitingRoom, this);
             Thread patientThread = new Thread(patient, "Patient-" + i);
@@ -52,7 +50,6 @@ public class Hospital {
             patientThread.start();
         }
 
-        // Create and start all Doctor threads
         for (int i = 0; i < numberOfDoctors; i++) {
             Doctor doctor = new Doctor(i, waitingRoom, treatmentRoom, this);
             Thread doctorThread = new Thread(doctor, "Doctor-" + i);
@@ -60,8 +57,6 @@ public class Hospital {
             doctorThread.start();
         }
 
-        // Wait for all patient threads to complete (all patients treated)
-        // Patient.run() should complete after the patient has been treated
         for (Thread t : patientThreads) {
             try {
                 t.join();
@@ -72,17 +67,14 @@ public class Hospital {
             }
         }
 
-        // All patients have been treated at this point
         synchronized (shutdownLock) {
             allPatientsTreated = true;
             shutdownLock.notifyAll();
         }
         log("All patients have completed treatment. Initiating doctor shutdown...");
 
-        // Close the waiting room to unblock any doctors waiting on take()
         waitingRoom.close();
 
-        // Wait for all doctor threads to finish
         for (Thread t : doctorThreads) {
             try {
                 t.join();
@@ -129,7 +121,7 @@ public class Hospital {
                 System.out.println("Value must be a positive integer. Please try again.");
             } catch (InputMismatchException e) {
                 System.out.println("Invalid input. Please enter a positive integer.");
-                scanner.next(); // consume invalid token
+                scanner.next(); 
             }
         }
     }
