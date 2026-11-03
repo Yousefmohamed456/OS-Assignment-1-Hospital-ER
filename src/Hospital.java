@@ -41,7 +41,7 @@ public class Hospital {
         log("Number of patients: " + numberOfPatients);
 
         waitingRoom = new WaitingRoom(waitingRoomCapacity);
-        treatmentRoom = new TreatmentRoom(2); 
+        treatmentRoom = new TreatmentRoom(); 
 
         for (int i = 0; i < numberOfPatients; i++) {
             Patient patient = new Patient(i, waitingRoom, this);
