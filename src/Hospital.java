@@ -1,5 +1,4 @@
 import java.util.ArrayList;
-import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Scanner;
 
@@ -14,9 +13,9 @@ public class Hospital {
     private final List<Thread> patientThreads = new ArrayList<>();
     private final List<Thread> doctorThreads = new ArrayList<>();
 
-    private final Object shutdownLock = new Object();
+    private final Object countLock = new Object();
+    private final Object logLock = new Object();
     private int treatedCount = 0;
-    private volatile boolean allPatientsTreated = false;
 
     public Hospital(int waitingRoomCapacity, int numberOfDoctors, int numberOfPatients) {
         if (waitingRoomCapacity <= 0) {
@@ -35,26 +34,23 @@ public class Hospital {
     }
 
     public void startSimulation() {
-        log("Starting hospital simulation...");
-        log("Waiting room capacity: " + waitingRoomCapacity);
-        log("Number of doctors: " + numberOfDoctors);
-        log("Number of patients: " + numberOfPatients);
+        waitingRoom = new WaitingRoom(waitingRoomCapacity, this);
+        treatmentRoom = new TreatmentRoom();
 
-        waitingRoom = new WaitingRoom(waitingRoomCapacity);
-        treatmentRoom = new TreatmentRoom(); 
+        log(patientArrivalList());
 
-        for (int i = 0; i < numberOfPatients; i++) {
-            Patient patient = new Patient(i, waitingRoom, this);
-            Thread patientThread = new Thread(patient, "Patient-" + i);
-            patientThreads.add(patientThread);
-            patientThread.start();
-        }
-
-        for (int i = 0; i < numberOfDoctors; i++) {
+        for (int i = 1; i <= numberOfDoctors; i++) {
             Doctor doctor = new Doctor(i, waitingRoom, treatmentRoom, this);
             Thread doctorThread = new Thread(doctor, "Doctor-" + i);
             doctorThreads.add(doctorThread);
             doctorThread.start();
+        }
+
+        for (int i = 1; i <= numberOfPatients; i++) {
+            Patient patient = new Patient(i, waitingRoom, this);
+            Thread patientThread = new Thread(patient, "Patient-" + i);
+            patientThreads.add(patientThread);
+            patientThread.start();
         }
 
         for (Thread t : patientThreads) {
@@ -62,16 +58,11 @@ public class Hospital {
                 t.join();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log("Interrupted while waiting for patient thread: " + t.getName());
+                waitingRoom.close();
+                log("Simulation interrupted while waiting for patients.");
                 return;
             }
         }
-
-        synchronized (shutdownLock) {
-            allPatientsTreated = true;
-            shutdownLock.notifyAll();
-        }
-        log("All patients have completed treatment. Initiating doctor shutdown...");
 
         waitingRoom.close();
 
@@ -80,7 +71,15 @@ public class Hospital {
                 t.join();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log("Interrupted while waiting for doctor thread: " + t.getName());
+                log("Simulation interrupted while waiting for doctors.");
+                return;
+            }
+        }
+
+        synchronized (countLock) {
+            if (treatedCount != numberOfPatients) {
+                log("Simulation ended with " + treatedCount + " of "
+                        + numberOfPatients + " patients treated.");
                 return;
             }
         }
@@ -89,42 +88,66 @@ public class Hospital {
         log("Simulation completed.");
     }
 
-    public void log(String message) {
-        System.out.println(message);
+    private String patientArrivalList() {
+        StringBuilder result = new StringBuilder("Patients arriving: ");
+        for (int i = 1; i <= numberOfPatients; i++) {
+            if (i > 1) {
+                result.append(' ');
+            }
+            result.append('P').append(i);
+        }
+        return result.toString();
     }
 
-    public void onPatientTreated(Patient patient) {
-        synchronized (shutdownLock) {
-            treatedCount++;
-            log("Patient " + patient.getId() + " has been treated. (" + treatedCount + "/" + numberOfPatients + ")");
-            if (treatedCount >= numberOfPatients) {
-                allPatientsTreated = true;
-                shutdownLock.notifyAll();
+    public void log(String message) {
+        synchronized (logLock) {
+            System.out.println(message);
+        }
+    }
+
+    public void logEvent(String... messages) {
+        synchronized (logLock) {
+            for (String message : messages) {
+                System.out.println(message);
             }
         }
     }
 
+    public void onPatientTreated(Patient patient) {
+        synchronized (countLock) {
+            treatedCount++;
+        }
+    }
+
     public boolean areAllPatientsTreated() {
-        synchronized (shutdownLock) {
-            return allPatientsTreated;
+        synchronized (countLock) {
+            return treatedCount == numberOfPatients;
         }
     }
 
     private static int readPositiveInt(Scanner scanner, String prompt) {
         while (true) {
             System.out.print(prompt);
-            try {
+
+            if (!scanner.hasNext()) {
+                System.out.println();
+                System.out.println("No more input. Exiting.");
+                return -1;
+            }
+
+            if (scanner.hasNextInt()) {
                 int value = scanner.nextInt();
                 if (value > 0) {
                     return value;
                 }
                 System.out.println("Value must be a positive integer. Please try again.");
-            } catch (InputMismatchException e) {
+            } else {
+                scanner.next();
                 System.out.println("Invalid input. Please enter a positive integer.");
-                scanner.next(); 
             }
         }
     }
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
@@ -132,8 +155,22 @@ public class Hospital {
         System.out.println();
 
         int waitingRoomCapacity = readPositiveInt(scanner, "Enter waiting room capacity: ");
+        if (waitingRoomCapacity < 0) {
+            scanner.close();
+            return;
+        }
+
         int numberOfDoctors = readPositiveInt(scanner, "Enter number of doctors: ");
+        if (numberOfDoctors < 0) {
+            scanner.close();
+            return;
+        }
+
         int numberOfPatients = readPositiveInt(scanner, "Enter number of patients: ");
+        if (numberOfPatients < 0) {
+            scanner.close();
+            return;
+        }
 
         scanner.close();
 

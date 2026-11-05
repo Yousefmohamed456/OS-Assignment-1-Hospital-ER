@@ -2,16 +2,19 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class Doctor implements Runnable {
 
+    private static final long TREATMENT_ROOM_TIMEOUT_MS = 3000;
+    private static final int MIN_TREATMENT_MS = 1000;
+    private static final int MAX_TREATMENT_MS = 5000;
+
     private final int id;
     private final WaitingRoom waitingRoom;
     private final TreatmentRoom treatmentRoom;
     private final Hospital hospital;
 
     public Doctor(int id,
-                  WaitingRoom waitingRoom,
-                  TreatmentRoom treatmentRoom,
-                  Hospital hospital) {
-
+            WaitingRoom waitingRoom,
+            TreatmentRoom treatmentRoom,
+            Hospital hospital) {
         this.id = id;
         this.waitingRoom = waitingRoom;
         this.treatmentRoom = treatmentRoom;
@@ -20,83 +23,63 @@ public class Doctor implements Runnable {
 
     @Override
     public void run() {
-
-        while (!Thread.currentThread().isInterrupted()) {
-
+        while (true) {
             Patient patient = waitingRoom.take();
 
             if (patient == null) {
                 break;
             }
 
-            hospital.log("Doctor " + (id + 1)
-                    + " is assigned to P" + (patient.getId() + 1) + ".");
+            try {
+                hospital.logEvent("Doctor " + id + " is assigned to P" + patient.getId() + ".",
+                        "Doctor " + id + " is trying to acquire a treatment room.");
+            } finally {
+                waitingRoom.releaseSeat();
+            }
 
-            hospital.log("Doctor " + (id + 1)
-                    + " is trying to acquire a treatment room.");
+            if (!treatmentRoom.tryAcquire(TREATMENT_ROOM_TIMEOUT_MS)) {
+                hospital.logEvent("Doctor " + id + " could not acquire a treatment room.",
+                        "Doctor " + id + " is sending P" + patient.getId()
+                                + " back to the waiting room.");
 
-            boolean acquired = treatmentRoom.tryAcquire(3000);
-
-            if (!acquired) {
-
-                hospital.log("Doctor " + (id + 1)
-                        + " could not acquire a treatment room.");
-
-                hospital.log("Doctor " + (id + 1)
-                        + " is sending P" + (patient.getId() + 1)
-                        + " back to the waiting room.");
-
-                waitingRoom.put(patient);
-
+                patient.markRejected();
+                hospital.log("Doctor " + id + " is now available.");
                 continue;
             }
 
-            hospital.log("Doctor " + (id + 1)
-                    + " acquired a treatment room.");
+            hospital.logEvent("Doctor " + id + " acquired a treatment room.",
+                    "Doctor " + id + " begins treating P" + patient.getId() + ".");
 
-            treat(patient);
+            boolean completed = treat(patient);
 
-            if (Thread.currentThread().isInterrupted()) {
+            if (!completed) {
+                patient.markRejected();
                 break;
             }
 
             hospital.onPatientTreated(patient);
+            hospital.log("Doctor " + id + " is now available.");
+            patient.markTreated();
+        }
+    }
 
-            hospital.log("Doctor " + (id + 1)
-                    + " is now available.");
-
-            hospital.log("P" + (patient.getId() + 1) + " left.");
+    private boolean treat(Patient patient) {
+        try {
+            int treatmentTime = ThreadLocalRandom.current()
+                    .nextInt(MIN_TREATMENT_MS, MAX_TREATMENT_MS + 1);
+            Thread.sleep(treatmentTime);
+            hospital.log("Doctor " + id + " finished treating P" + patient.getId() + ".");
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } finally {
+            hospital.log("Doctor " + id + " released the treatment room.");
+            treatmentRoom.release();
         }
     }
 
     public int getId() {
         return id;
-    }
-
-    public void treat(Patient patient) {
-
-        hospital.log("Doctor " + (id + 1)
-                + " begins treating P" + (patient.getId() + 1) + ".");
-
-        try {
-
-            int treatmentTime =
-                    ThreadLocalRandom.current().nextInt(1000, 5001);
-
-            Thread.sleep(treatmentTime);
-
-            hospital.log("Doctor " + (id + 1)
-                    + " finished treating P" + (patient.getId() + 1) + ".");
-
-        } catch (InterruptedException e) {
-
-            Thread.currentThread().interrupt();
-
-        } finally {
-            treatmentRoom.release();
-
-            hospital.log("Doctor " + (id + 1)
-                    + " released the treatment room.");
-        }
     }
 }

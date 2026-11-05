@@ -1,15 +1,19 @@
 public class TreatmentRoom {
-    private Semaphore Semaphore1;
+    private final Semaphore rooms;
 
     public TreatmentRoom() {
-        this.Semaphore1 = new Semaphore(2);
+        this.rooms = new Semaphore(2);
     }
 
-    public boolean tryAcquire(long timeout) {
-        return Semaphore1.tryAcquire(timeout); // bnktb el w2t b millsecond 
+    public boolean tryAcquire(long timeoutMillis) {
+        return rooms.tryAcquire(timeoutMillis);
     }
 
     public void release() {
-        Semaphore1.release();
+        rooms.release();
+    }
+
+    public int availableRooms() {
+        return rooms.availablePermits();
     }
 }
