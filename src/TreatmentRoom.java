@@ -1,9 +1,15 @@
 public class TreatmentRoom {
-    public TreatmentRoom(int capacity) {}
+    private Semaphore Semaphore1;
 
-    public boolean tryAcquire(long timeoutMillis) {
-        return false;
+    public TreatmentRoom() {
+        this.Semaphore1 = new Semaphore(2);
     }
 
-    public void release() {}
+    public boolean tryAcquire(long timeout) {
+        return Semaphore1.tryAcquire(timeout); // bnktb el w2t b millsecond 
+    }
+
+    public void release() {
+        Semaphore1.release();
+    }
 }

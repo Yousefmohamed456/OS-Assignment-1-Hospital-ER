@@ -1,11 +1,32 @@
 public class Semaphore {
-    public Semaphore(int initialPermits) {}
+    protected int value = 0;
+    protected  Semaphore(int initialPermits) {value = initialPermits;}
 
-    public void acquire() {}
-
-    public boolean tryAcquire(long timeoutMillis) {
-        return false;
+    public synchronized void acquire() {
+            while (value <= 0) {
+                try { wait(); } catch (InterruptedException e) { }
+            }
+            value--; 
     }
 
-    public void release() {}
+    public synchronized boolean tryAcquire(long timeout) {
+        long timeoytEnd = System.currentTimeMillis() + timeout;
+        while (value <= 0) {
+            long timeoutLeft = timeoytEnd - System.currentTimeMillis();
+            if (timeoutLeft <= 0) return false;
+            try { wait(timeoutLeft); }
+            catch (InterruptedException e) { return false; }
+        }
+        value--;
+        return true;
+    }
+    
+
+    public synchronized void release() {
+        value++;
+        if (value <= 0) {
+            notify();
+        }
+
+    }
 }
